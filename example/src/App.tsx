@@ -1,11 +1,12 @@
 import * as React from 'react';
 
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import SearchScreen from './AutoCompletePredictions';
 
 export default function App() {
   return (
     <View style={styles.container}>
-      <Text>Result: {'Temp'}</Text>
+      <SearchScreen />
     </View>
   );
 }
@@ -13,6 +14,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },

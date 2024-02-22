@@ -482,17 +482,35 @@ export type PlaceFields = keyof GMSTypes.Place;
  */
 export interface RNGooglePlacesNativeOptions {
   /**
+   * @Deprecated: Use filterTypes instead.
    * The type of results to return.
    */
   type: GMSTypes.AutocompleteType | null;
 
   /**
+   * The filter applied to an autocomplete request to restrict results using up to 5 different place types.
+   */
+  types: Array<
+    GMSTypes.PlaceType | GMSTypes.ReadOnlyPlaceType | GMSTypes.AutocompleteType
+  > | null;
+
+  /**
+   * @Deprecated: Use countries instead.
+   *
    * Limit results to a specific country using a
    * [ISO 3166-1 Alpha-2 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
    * (case-insensitive). If this is not set, no country filtering will take
    * place.
    */
   country: string;
+
+  /**
+   *
+   * The countries to restrict results to.
+   * This should be a ISO 3166-1 Alpha-2 country code (case-insensitive).
+   * Supports up to 5 countries to filter. If nil, no country filtering will take place.
+   */
+  countries: string[] | null;
 
   /**
    * If true, the autocomplete modal will
@@ -509,7 +527,6 @@ export interface RNGooglePlacesNativeOptions {
    * Note: This property is Android only.
    */
   initialQuery: string;
-  useSessionToken: boolean;
 
   /**
    * To bias autocomplete results to a specific geographic region.

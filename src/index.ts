@@ -8,10 +8,11 @@ const RNGooglePlacesNative = NativeModules.RNGooglePlaces;
 class RNGooglePlaces {
   static optionsDefaults: RNGooglePlacesNativeOptions = {
     type: null,
+    types: null,
     country: '',
+    countries: null,
     useOverlay: false,
     initialQuery: '',
-    useSessionToken: true,
     locationBias: {
       latitudeSW: 0,
       longitudeSW: 0,
@@ -26,7 +27,7 @@ class RNGooglePlaces {
     },
   };
 
-  static placeFieldsDefaults: (keyof GMSTypes.Place)[];
+  static placeFieldsDefaults: (keyof GMSTypes.Place)[] = [];
 
   openAutocompleteModal(
     options: Partial<RNGooglePlacesNativeOptions> = {},
@@ -67,6 +68,15 @@ class RNGooglePlaces {
       ...placeFields,
     ]);
   }
+
+  beginAutocompleteSession() {
+    return RNGooglePlacesNative.beginAutocompleteSession();
+  }
+
+  cancelAutocompleteSession() {
+    return RNGooglePlacesNative.cancelAutocompleteSession();
+  }
 }
 
-export default new RNGooglePlaces();
+const RNGooglePlacesCompat = new RNGooglePlaces();
+export default RNGooglePlacesCompat;

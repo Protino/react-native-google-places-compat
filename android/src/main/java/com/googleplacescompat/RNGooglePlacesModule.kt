@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.text.TextUtils
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -24,7 +25,6 @@ import com.google.android.libraries.places.api.model.AutocompleteSessionToken
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.model.PlaceLikelihood
 import com.google.android.libraries.places.api.model.RectangularBounds
-import com.google.android.libraries.places.api.model.TypeFilter
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FetchPlaceResponse
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
@@ -45,6 +45,7 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
   private var pendingPromise: Promise? = null
   private var lastSelectedFields: List<Place.Field>? = null
   private val placesClient: PlacesClient
+  private var sessionToken: AutocompleteSessionToken? = null
 
   init {
     val apiKey = reactContext.applicationContext.getString(R.string.places_api_key)
@@ -112,9 +113,10 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
     }
     pendingPromise = promise
     lastSelectedFields = ArrayList()
-    val type = options.getString("type")
-    val country =
-      options.getString("country")?.let { it.ifBlank { return@let null } }
+    val filterTypes =
+      options.getArray("types")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
+    val countries =
+      options.getArray("countries")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
     val initialQuery = options.getString("initialQuery")
     val useOverlay = options.getBoolean("useOverlay")
     val locationBias = options.getMap("locationBias")
@@ -148,15 +150,25 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
         )
       )
     }
-    autocompleteIntent.setCountry(country)
+    autocompleteIntent.setCountries(countries)
     if (initialQuery != null) {
       autocompleteIntent.setInitialQuery(initialQuery)
     }
-    autocompleteIntent.setTypeFilter(getFilterType(type))
+    autocompleteIntent.setTypesFilter(filterTypes)
     currentActivity.startActivityForResult(
       autocompleteIntent.build(reactContext.applicationContext),
       AUTOCOMPLETE_REQUEST_CODE
     )
+  }
+
+  @ReactMethod
+  fun beginAutocompleteSession() {
+    sessionToken = AutocompleteSessionToken.newInstance()
+  }
+
+  @ReactMethod
+  fun cancelAutocompleteSession() {
+    sessionToken = null
   }
 
   @ReactMethod
@@ -169,9 +181,10 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
       )
       return
     }
-    val type = options.getString("type")
-    val country = options.getString("country")?.let { it.ifBlank { return@let null } }
-    val useSessionToken = options.getBoolean("useSessionToken")
+    val filterTypes =
+      options.getArray("types")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
+    val countries =
+      options.getArray("countries")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
     val locationBias = options.getMap("locationBias")
     val biasToLatitudeSW = locationBias?.getDouble("latitudeSW") ?: 0.0
     val biasToLongitudeSW = locationBias?.getDouble("longitudeSW") ?: 0.0
@@ -184,9 +197,7 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
     val restrictToLongitudeNE = locationRestriction?.getDouble("longitudeNE") ?: 0.0
     val requestBuilder = FindAutocompletePredictionsRequest.builder()
       .setQuery(query)
-    if (country != null) {
-      requestBuilder.setCountry(country)
-    }
+    requestBuilder.countries = countries
     if (biasToLatitudeSW != 0.0 && biasToLongitudeSW != 0.0 && biasToLatitudeNE != 0.0 && biasToLongitudeNE != 0.0) {
       requestBuilder.locationBias = RectangularBounds.newInstance(
         LatLng(biasToLatitudeSW, biasToLongitudeSW),
@@ -199,9 +210,9 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
         LatLng(restrictToLatitudeNE, restrictToLongitudeNE)
       )
     }
-    requestBuilder.typeFilter = getFilterType(type)
-    if (useSessionToken) {
-      requestBuilder.sessionToken = AutocompleteSessionToken.newInstance()
+    requestBuilder.typesFilter = filterTypes
+    if (sessionToken != null) {
+      requestBuilder.sessionToken = sessionToken
     }
     val task = placesClient.findAutocompletePredictions(requestBuilder.build())
     task.addOnSuccessListener { response: FindAutocompletePredictionsResponse ->
@@ -225,6 +236,7 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
       promise.resolve(predictionsList)
     }
     task.addOnFailureListener { exception: Exception ->
+      Log.e(TAG, "getAutocompletePredictions: ", exception)
       promise.reject(
         "E_AUTOCOMPLETE_ERROR",
         Error(exception.message)
@@ -247,12 +259,16 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
       return
     }
     val selectedFields = getPlaceFields(fields.toArrayList(), false)
-    val request = FetchPlaceRequest.builder(placeID, selectedFields).build()
-    placesClient.fetchPlace(request).addOnSuccessListener { response: FetchPlaceResponse ->
+    val builder = FetchPlaceRequest.builder(placeID, selectedFields)
+    if (sessionToken != null) {
+      builder.sessionToken = sessionToken
+    }
+    placesClient.fetchPlace(builder.build()).addOnSuccessListener { response: FetchPlaceResponse ->
       val place = response.place
       val map = propertiesMapForPlace(place, selectedFields)
       promise.resolve(map)
     }.addOnFailureListener { exception: Exception ->
+      Log.e(TAG, "lookUpPlaceByID: ", exception)
       promise.reject(
         "E_PLACE_DETAILS_ERROR",
         Error(exception.message)
@@ -313,6 +329,7 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
       promise.resolve(likelyPlacesList)
     }
     currentPlaceTask.addOnFailureListener { exception: Exception ->
+      Log.e(TAG, "findCurrentPlaceWithPermissions: ", exception)
       promise.reject(
         "E_CURRENT_PLACE_ERROR",
         Error(exception.message)
@@ -440,19 +457,6 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
     return map
   }
 
-  //todo: Replace usage of TypeFilter
-  private fun getFilterType(type: String?): TypeFilter? {
-    val mappedFilter: TypeFilter? = when (type) {
-      "geocode" -> TypeFilter.GEOCODE
-      "address" -> TypeFilter.ADDRESS
-      "establishment" -> TypeFilter.ESTABLISHMENT
-      "regions" -> TypeFilter.REGIONS
-      "cities" -> TypeFilter.CITIES
-      else -> null
-    }
-    return mappedFilter
-  }
-
   private fun getPlaceFields(
     placeFields: ArrayList<Any>,
     isCurrentOrFetchPlace: Boolean
@@ -461,7 +465,7 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
     if (placeFields.size == 0 && !isCurrentOrFetchPlace) {
       return listOf(*Place.Field.values())
     }
-    if (placeFields.size == 0 && isCurrentOrFetchPlace) {
+    if (placeFields.size == 0) {
       val allPlaceFields: MutableList<Place.Field> =
         ArrayList(listOf(*Place.Field.values()))
       allPlaceFields.removeAll(

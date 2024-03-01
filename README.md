@@ -10,13 +10,7 @@ npm install react-native-google-places-compat
 
 ## Usage
 
-```js
-import { multiply } from 'react-native-google-places-compat';
-
-// ...
-
-const result = await multiply(3, 7);
-```
+[WIP]
 
 ## Contributing
 

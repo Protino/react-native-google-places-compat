@@ -8,7 +8,6 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
     static var instance: RNGooglePlaces?
     var token: GMSAutocompleteSessionToken?
     var locationManager: CLLocationManager!
-    //  var boundsMode: GMSAUTOCOMplete = .bias
 
     override init() {
         super.init()

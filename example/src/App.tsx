@@ -1,13 +1,13 @@
 import * as React from 'react';
 
-import { StyleSheet, View } from 'react-native';
+import { SafeAreaView, StyleSheet } from 'react-native';
 import SearchScreen from './AutoCompletePredictions';
 
 export default function App() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <SearchScreen />
-    </View>
+    </SafeAreaView>
   );
 }
 

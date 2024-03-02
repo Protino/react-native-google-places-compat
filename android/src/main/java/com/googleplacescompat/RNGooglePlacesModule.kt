@@ -38,29 +38,25 @@ import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 import com.googleplacescompat.RNGooglePlacesPlaceFieldEnum.Companion.findByFieldKey
 import com.googleplacescompat.RNGooglePlacesPlaceTypeEnum.Companion.findByTypeId
 
-class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
+class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext), ActivityEventListener {
 
-  private val reactContext: ReactApplicationContext
   private var pendingPromise: Promise? = null
   private var lastSelectedFields: List<Place.Field>? = null
-  private val placesClient: PlacesClient
+  private lateinit var placesClient: PlacesClient
   private var sessionToken: AutocompleteSessionToken? = null
-
-  init {
-    val apiKey = reactContext.applicationContext.getString(R.string.places_api_key)
-
-    // Setup Places Client
-    if (!Places.isInitialized() && apiKey != "") {
-      Places.initialize(reactContext.applicationContext, apiKey)
-    }
-    placesClient = Places.createClient(reactContext.applicationContext)
-    this.reactContext = reactContext
-    this.reactContext.addActivityEventListener(this)
-  }
 
   override fun getName(): String {
     return REACT_CLASS
+  }
+
+  @ReactMethod
+  fun initializePlaceClient(apiKey: String) {
+    if (!Places.isInitialized() && apiKey.isNotBlank()) {
+      Places.initialize(reactContext.applicationContext, apiKey)
+      placesClient = Places.createClient(reactContext.applicationContext)
+      reactContext.addActivityEventListener(this)
+    }
   }
 
   /**
@@ -167,7 +163,7 @@ class RNGooglePlacesModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun cancelAutocompleteSession() {
+  fun endAutocompleteSession() {
     sessionToken = null
   }
 

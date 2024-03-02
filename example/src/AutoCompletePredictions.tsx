@@ -13,6 +13,7 @@ import type { GMSTypes } from '../../src/types';
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
+  const [sessionStarted, setSessionStarted] = useState(false);
   const [predictions, setPredictions] = useState<
     GMSTypes.AutocompletePrediction[]
   >([]);
@@ -24,6 +25,9 @@ export default function SearchScreen() {
     const fetchPredictions = async () => {
       if (debouncedQuery) {
         try {
+          if (!sessionStarted) {
+            RNGooglePlacesCompat.beginAutocompleteSession();
+          }
           const results = await RNGooglePlacesCompat.getAutocompletePredictions(
             debouncedQuery,
             {
@@ -41,13 +45,15 @@ export default function SearchScreen() {
     };
 
     fetchPredictions();
-  }, [debouncedQuery]); // Effect depends on the debounced query
+  }, [debouncedQuery, sessionStarted]); // Effect depends on the debounced query
 
   const selectPlace = async (placeId: string) => {
     try {
       setPredictions([]);
       console.log('Searching place by id - ', placeId);
       const place = await RNGooglePlacesCompat.lookUpPlaceByID(placeId);
+      RNGooglePlacesCompat.endAutocompleteSession();
+      setSessionStarted(false);
       setSelectedPlace(place);
       console.log('Place found - ', place);
     } catch (error) {

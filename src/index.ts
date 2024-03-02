@@ -29,6 +29,10 @@ class RNGooglePlaces {
 
   static placeFieldsDefaults: (keyof GMSTypes.Place)[] = [];
 
+  initializePlaceClient(apiKey: string) {
+    RNGooglePlacesNative.initializePlaceClient(apiKey);
+  }
+
   openAutocompleteModal(
     options: Partial<RNGooglePlacesNativeOptions> = {},
     placeFields: PlaceFields[] = []
@@ -73,8 +77,8 @@ class RNGooglePlaces {
     return RNGooglePlacesNative.beginAutocompleteSession();
   }
 
-  cancelAutocompleteSession() {
-    return RNGooglePlacesNative.cancelAutocompleteSession();
+  endAutocompleteSession() {
+    return RNGooglePlacesNative.endAutocompleteSession();
   }
 }
 

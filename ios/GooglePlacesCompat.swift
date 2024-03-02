@@ -32,6 +32,18 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
         return DispatchQueue.main
     }
 
+    @objc func initializePlaceClient(_ apiKey: String) {
+        GMSPlacesClient.provideAPIKey(apiKey)
+    }
+
+    @objc func beginAutocompleteSession() {
+        token = GMSAutocompleteSessionToken.init()
+    }
+
+    @objc func endAutocompleteSession() {
+        token = nil
+    }
+
     @objc func openAutocompleteModal(_ options: NSDictionary, withFields fields: [String], resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
         do {
             // Assume RNGooglePlacesViewController has been translated to Swift

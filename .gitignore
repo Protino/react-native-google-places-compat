@@ -41,7 +41,7 @@ local.properties
 android.iml
 
 #keys
-example/ios/config.plist
+example/config.json
 
 # Cocoapods
 #

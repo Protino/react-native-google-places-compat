@@ -37,10 +37,11 @@ If you use `getAutocompletePredictions` utilize session tokens to optimize API c
   RNGooglePlacesCompat.beginAutocompleteSession();
   // RNGooglePlacesCompat.getAutocompletePredictions();
   // ... more prediction calls
-  // Session is terminated if lookUpPlaceByID() is called
-  // or you can end the session manually by calling
+  // End the session by calling
   RNGooglePlacesCompat.endAutocompleteSession();
 ```
+You can keep track of the session via - `RNGooglePlacesCompat.isAutoCompleteSessionStarted()`
+
 Refer examples in the [example](/example/src/AutoCompletePredictions.tsx) directory for more details.
 ## Contributing
 

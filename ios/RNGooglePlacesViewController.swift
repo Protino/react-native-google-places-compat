@@ -50,19 +50,19 @@ class RNGooglePlacesViewController: UIViewController, GMSAutocompleteViewControl
     }
     
     func viewController(_ viewController: GMSAutocompleteViewController, didAutocompleteWith place: GMSPlace) {
-        dismiss(animated: true) {
+        viewController.dismiss(animated: true) {
             self.resolve?(place.toDictionary()) // Assuming the extension to GMSPlace is implemented
         }
     }
     
     func viewController(_ viewController: GMSAutocompleteViewController, didFailAutocompleteWithError error: Error) {
-        dismiss(animated: true) {
+        viewController.dismiss(animated: true) {
             self.reject?("E_AUTOCOMPLETE_ERROR", error.localizedDescription, nil)
         }
     }
     
     func wasCancelled(_ viewController: GMSAutocompleteViewController) {
-        dismiss(animated: true) {
+        viewController.dismiss(animated: true) {
             self.reject?("E_USER_CANCELED", "Search cancelled", nil)
         }
     }

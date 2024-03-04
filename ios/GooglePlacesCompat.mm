@@ -2,6 +2,8 @@
 
 @interface RCT_EXTERN_MODULE(RNGooglePlaces, NSObject)
 
+RCT_EXTERN_METHOD(initializePlaceClient:(NSString *)apiKey)
+
 RCT_EXTERN_METHOD(openAutocompleteModal:(NSDictionary *)options
                   withFields:(NSArray<NSString *> *)fields
                   resolver:(RCTPromiseResolveBlock)resolve

@@ -1,6 +1,6 @@
 {
   "name": "react-native-google-places-compat",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "An update of react-native-google-places library, brings compatibility with newer React Native version (0.71.x). It addresses dependency and compatibility issues, ensuring seamless integration with Google Places API for React Native projects.",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",

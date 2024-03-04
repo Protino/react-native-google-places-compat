@@ -21,6 +21,14 @@ RCT_EXTERN_METHOD(getCurrentPlace:(NSArray<NSString *> *)fields
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(beginAutocompleteSession)
+
+RCT_EXTERN_METHOD(endAutocompleteSession)
+
+RCT_EXTERN_METHOD(isAutoCompleteSessionStarted:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+
 + (BOOL)requiresMainQueueSetup
 {
   return NO;

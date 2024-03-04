@@ -80,6 +80,10 @@ class RNGooglePlaces {
   endAutocompleteSession() {
     return RNGooglePlacesNative.endAutocompleteSession();
   }
+
+  isAutoCompleteSessionStarted(): Promise<Boolean> {
+    return RNGooglePlacesNative.isAutoCompleteSessionStarted();
+  }
 }
 
 const RNGooglePlacesCompat = new RNGooglePlaces();

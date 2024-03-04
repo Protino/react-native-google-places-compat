@@ -163,6 +163,11 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun isAutoCompleteSessionStarted(promise: Promise) {
+    return promise.resolve(sessionToken != null)
+  }
+
+  @ReactMethod
   fun endAutocompleteSession() {
     sessionToken = null
   }

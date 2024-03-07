@@ -1,7 +1,6 @@
 // Assuming the interfaces and types from your index.d.ts or similar have been defined
 import { NativeModules } from 'react-native';
-import type { GMSTypes, PlaceFields } from './types';
-import type { CurrentPlace, RNGooglePlacesNativeOptions } from './types';
+import type { GMSTypes, PlaceFields, CurrentPlace, RNGooglePlacesNativeOptions } from './types';
 
 const RNGooglePlacesNative = NativeModules.RNGooglePlaces;
 
@@ -87,4 +86,5 @@ class RNGooglePlaces {
 }
 
 const RNGooglePlacesCompat = new RNGooglePlaces();
+export type {GMSTypes};
 export default RNGooglePlacesCompat;

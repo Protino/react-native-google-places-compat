@@ -1,6 +1,11 @@
 // Assuming the interfaces and types from your index.d.ts or similar have been defined
 import { NativeModules } from 'react-native';
-import type { GMSTypes, PlaceFields, CurrentPlace, RNGooglePlacesNativeOptions } from './types';
+import type {
+  GMSTypes,
+  PlaceFields,
+  CurrentPlace,
+  RNGooglePlacesNativeOptions,
+} from './types';
 
 const RNGooglePlacesNative = NativeModules.RNGooglePlaces;
 
@@ -28,8 +33,14 @@ class RNGooglePlaces {
 
   static placeFieldsDefaults: (keyof GMSTypes.Place)[] = [];
 
-  initializePlaceClient(apiKey: string) {
-    RNGooglePlacesNative.initializePlaceClient(apiKey);
+  initializePlaceClient(
+    apiKey: string,
+    sessionBasedAutocomplete: boolean = false
+  ) {
+    RNGooglePlacesNative.initializePlaceClient(
+      apiKey,
+      sessionBasedAutocomplete
+    );
   }
 
   openAutocompleteModal(
@@ -72,19 +83,16 @@ class RNGooglePlaces {
     ]);
   }
 
-  beginAutocompleteSession() {
-    return RNGooglePlacesNative.beginAutocompleteSession();
+  setSessionBasedAutocomplete(enabled: boolean) {
+    RNGooglePlacesNative.setSessionBasedAutocomplete(enabled);
+    this.refreshSessionToken();
   }
 
-  endAutocompleteSession() {
-    return RNGooglePlacesNative.endAutocompleteSession();
-  }
-
-  isAutoCompleteSessionStarted(): Promise<Boolean> {
-    return RNGooglePlacesNative.isAutoCompleteSessionStarted();
+  refreshSessionToken() {
+    RNGooglePlacesNative.refreshSessionToken();
   }
 }
 
 const RNGooglePlacesCompat = new RNGooglePlaces();
-export type {GMSTypes};
+export type { GMSTypes };
 export default RNGooglePlacesCompat;

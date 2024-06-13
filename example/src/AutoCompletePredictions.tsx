@@ -10,6 +10,7 @@ import {
 import { useDebounce } from './Utils';
 import RNGooglePlacesCompat from 'react-native-google-places-compat';
 import type { GMSTypes } from '../../src/types';
+import { LOCATION_ONLY_FIELDS } from '../../src/';
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
@@ -52,7 +53,10 @@ export default function SearchScreen() {
     try {
       setPredictions([]);
       console.log('Searching place by id - ', placeId);
-      const place = await RNGooglePlacesCompat.lookUpPlaceByID(placeId);
+      const place = await RNGooglePlacesCompat.lookUpPlaceByID(
+        placeId,
+        LOCATION_ONLY_FIELDS
+      );
       setSelectedPlace(place);
       console.log('Place found - ', place);
     } catch (error) {
@@ -85,6 +89,9 @@ export default function SearchScreen() {
         <View style={styles.placeDetails}>
           <Text style={styles.placeName}>{selectedPlace.name}</Text>
           <Text>{selectedPlace.address}</Text>
+          <Text>
+            {selectedPlace.location.latitude},{selectedPlace.location.longitude}
+          </Text>
         </View>
       )}
     </View>

@@ -9,6 +9,15 @@ import type {
 
 const RNGooglePlacesNative = NativeModules.RNGooglePlaces;
 
+const LOCATION_ONLY_FIELDS: PlaceFields[] = [
+  'addressComponents',
+  'address',
+  'location',
+  'plusCode',
+  'types',
+  'viewport',
+];
+
 class RNGooglePlaces {
   static optionsDefaults: RNGooglePlacesNativeOptions = {
     type: null,
@@ -95,4 +104,5 @@ class RNGooglePlaces {
 
 const RNGooglePlacesCompat = new RNGooglePlaces();
 export type { GMSTypes };
+export { LOCATION_ONLY_FIELDS };
 export default RNGooglePlacesCompat;

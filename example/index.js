@@ -8,7 +8,8 @@ import Config from './config.json';
 RNGooglePlacesCompat.initializePlaceClient(
   Platform.OS === 'ios'
     ? Config.IOS_PLACES_API_KEY
-    : Config.ANDROID_PLACES_API_KEY
+    : Config.ANDROID_PLACES_API_KEY,
+  false
 );
 
 AppRegistry.registerComponent(appName, () => App);

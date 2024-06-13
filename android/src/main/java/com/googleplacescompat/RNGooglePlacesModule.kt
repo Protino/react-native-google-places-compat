@@ -19,12 +19,10 @@ import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.bridge.WritableNativeArray
-import com.google.android.gms.maps.model.LatLng
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.AutocompleteSessionToken
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.model.PlaceLikelihood
-import com.google.android.libraries.places.api.model.RectangularBounds
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FetchPlaceResponse
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
@@ -45,17 +43,20 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   private var lastSelectedFields: List<Place.Field>? = null
   private lateinit var placesClient: PlacesClient
   private var sessionToken: AutocompleteSessionToken? = null
+  private var sessionBasedAutoCompleteEnabled = false
 
   override fun getName(): String {
     return REACT_CLASS
   }
 
   @ReactMethod
-  fun initializePlaceClient(apiKey: String) {
+  fun initializePlaceClient(apiKey: String, sessionBasedAutocomplete: Boolean = false) {
     if (!Places.isInitialized() && apiKey.isNotBlank()) {
-      Places.initialize(reactContext.applicationContext, apiKey)
+      Places.initializeWithNewPlacesApiEnabled(reactContext.applicationContext, apiKey)
       placesClient = Places.createClient(reactContext.applicationContext)
       reactContext.addActivityEventListener(this)
+      sessionBasedAutoCompleteEnabled = sessionBasedAutocomplete
+      refreshSessionToken()
     }
   }
 
@@ -93,6 +94,19 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   /**
    * Exposed React's methods
    */
+
+  @ReactMethod
+  fun refreshSessionToken() {
+    if (sessionBasedAutoCompleteEnabled) {
+      sessionToken = AutocompleteSessionToken.newInstance()
+    }
+  }
+
+  @ReactMethod
+  fun setSessionBasedAutocomplete(enabled: Boolean) {
+    sessionBasedAutoCompleteEnabled = enabled
+  }
+
   @ReactMethod
   fun openAutocompleteModal(options: ReadableMap, fields: ReadableArray, promise: Promise) {
     if (!Places.isInitialized()) {
@@ -109,62 +123,34 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
     }
     pendingPromise = promise
     lastSelectedFields = ArrayList()
-    val filterTypes =
-      options.getArray("types")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
-    val countries =
-      options.getArray("countries")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
-    val initialQuery = options.getString("initialQuery")
-    val useOverlay = options.getBoolean("useOverlay")
-    val locationBias = options.getMap("locationBias")
-    val biasToLatitudeSW = locationBias?.getDouble("latitudeSW") ?: 0.0
-    val biasToLongitudeSW = locationBias?.getDouble("longitudeSW") ?: 0.0
-    val biasToLatitudeNE = locationBias?.getDouble("latitudeNE") ?: 0.0
-    val biasToLongitudeNE = locationBias?.getDouble("longitudeNE") ?: 0.0
-    val locationRestriction = options.getMap("locationRestriction")
-    val restrictToLatitudeSW = locationRestriction?.getDouble("latitudeSW") ?: 0.0
-    val restrictToLongitudeSW = locationRestriction?.getDouble("longitudeSW") ?: 0.0
-    val restrictToLatitudeNE = locationRestriction?.getDouble("latitudeNE") ?: 0.0
-    val restrictToLongitudeNE = locationRestriction?.getDouble("longitudeNE") ?: 0.0
+
+    val typedOptions = options.getAutoCompletePredictionsOptions()
+
     lastSelectedFields = getPlaceFields(fields.toArrayList(), false)
     val autocompleteIntent = Autocomplete.IntentBuilder(
-      if (useOverlay) AutocompleteActivityMode.OVERLAY else AutocompleteActivityMode.FULLSCREEN,
+      if (typedOptions.useOverlay) AutocompleteActivityMode.OVERLAY else AutocompleteActivityMode.FULLSCREEN,
       lastSelectedFields!!
     )
-    if (biasToLatitudeSW != 0.0 && biasToLongitudeSW != 0.0 && biasToLatitudeNE != 0.0 && biasToLongitudeNE != 0.0) {
-      autocompleteIntent.setLocationBias(
-        RectangularBounds.newInstance(
-          LatLng(biasToLatitudeSW, biasToLongitudeSW),
-          LatLng(biasToLatitudeNE, biasToLongitudeNE)
-        )
-      )
+
+    if (typedOptions.isLocationBiasSet()) {
+      autocompleteIntent.setLocationBias(typedOptions.locationBias?.toRectangularBounds())
     }
-    if (restrictToLatitudeSW != 0.0 && restrictToLongitudeSW != 0.0 && restrictToLatitudeNE != 0.0 && restrictToLongitudeNE != 0.0) {
-      autocompleteIntent.setLocationRestriction(
-        RectangularBounds.newInstance(
-          LatLng(restrictToLatitudeSW, restrictToLongitudeSW),
-          LatLng(restrictToLatitudeNE, restrictToLongitudeNE)
-        )
-      )
+
+    if (typedOptions.isLocationRestrictionSet()) {
+      autocompleteIntent.setLocationRestriction(typedOptions.locationRestriction?.toRectangularBounds())
     }
-    autocompleteIntent.setCountries(countries)
-    if (initialQuery != null) {
-      autocompleteIntent.setInitialQuery(initialQuery)
+
+    autocompleteIntent.setCountries(typedOptions.countries)
+    typedOptions.initialQuery?.let {
+      autocompleteIntent.setInitialQuery(it)
     }
-    autocompleteIntent.setTypesFilter(filterTypes)
+
+    autocompleteIntent.setTypesFilter(typedOptions.filterTypes
+    )
     currentActivity.startActivityForResult(
       autocompleteIntent.build(reactContext.applicationContext),
       AUTOCOMPLETE_REQUEST_CODE
     )
-  }
-
-  @ReactMethod
-  fun beginAutocompleteSession() {
-    sessionToken = AutocompleteSessionToken.newInstance()
-  }
-
-  @ReactMethod
-  fun endAutocompleteSession() {
-    sessionToken = null
   }
 
   @ReactMethod
@@ -177,39 +163,26 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
       )
       return
     }
-    val filterTypes =
-      options.getArray("types")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
-    val countries =
-      options.getArray("countries")?.toArrayList()?.mapNotNull { it as? String } ?: listOf()
-    val locationBias = options.getMap("locationBias")
-    val biasToLatitudeSW = locationBias?.getDouble("latitudeSW") ?: 0.0
-    val biasToLongitudeSW = locationBias?.getDouble("longitudeSW") ?: 0.0
-    val biasToLatitudeNE = locationBias?.getDouble("latitudeNE") ?: 0.0
-    val biasToLongitudeNE = locationBias?.getDouble("longitudeNE") ?: 0.0
-    val locationRestriction = options.getMap("locationRestriction")
-    val restrictToLatitudeSW = locationRestriction?.getDouble("latitudeSW") ?: 0.0
-    val restrictToLongitudeSW = locationRestriction?.getDouble("longitudeSW") ?: 0.0
-    val restrictToLatitudeNE = locationRestriction?.getDouble("latitudeNE") ?: 0.0
-    val restrictToLongitudeNE = locationRestriction?.getDouble("longitudeNE") ?: 0.0
+
+    val typedOptions = options.getAutoCompletePredictionsOptions()
     val requestBuilder = FindAutocompletePredictionsRequest.builder()
       .setQuery(query)
-    requestBuilder.countries = countries
-    if (biasToLatitudeSW != 0.0 && biasToLongitudeSW != 0.0 && biasToLatitudeNE != 0.0 && biasToLongitudeNE != 0.0) {
-      requestBuilder.locationBias = RectangularBounds.newInstance(
-        LatLng(biasToLatitudeSW, biasToLongitudeSW),
-        LatLng(biasToLatitudeNE, biasToLongitudeNE)
-      )
+    requestBuilder.typesFilter = typedOptions.filterTypes
+    requestBuilder.countries = typedOptions.countries
+
+    if (typedOptions.isLocationBiasSet()) {
+      requestBuilder.locationBias = typedOptions.locationBias?.toRectangularBounds()
     }
-    if (restrictToLatitudeSW != 0.0 && restrictToLongitudeSW != 0.0 && restrictToLatitudeNE != 0.0 && restrictToLongitudeNE != 0.0) {
-      requestBuilder.locationRestriction = RectangularBounds.newInstance(
-        LatLng(restrictToLatitudeSW, restrictToLongitudeSW),
-        LatLng(restrictToLatitudeNE, restrictToLongitudeNE)
-      )
+
+    if (typedOptions.isLocationRestrictionSet()) {
+      requestBuilder.locationRestriction = typedOptions.locationRestriction?.toRectangularBounds()
     }
-    requestBuilder.typesFilter = filterTypes
-    if (sessionToken != null) {
+
+    if (sessionToken != null && sessionBasedAutoCompleteEnabled) {
       requestBuilder.sessionToken = sessionToken
     }
+
+    Log.d(TAG, "getAutocompletePredictions: with options: $typedOptions\n sessionToken: $sessionToken")
     val task = placesClient.findAutocompletePredictions(requestBuilder.build())
     task.addOnSuccessListener { response: FindAutocompletePredictionsResponse ->
       if (response.autocompletePredictions.size == 0) {
@@ -256,9 +229,12 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
     }
     val selectedFields = getPlaceFields(fields.toArrayList(), false)
     val builder = FetchPlaceRequest.builder(placeID, selectedFields)
-    if (sessionToken != null) {
+    if (sessionToken != null && sessionBasedAutoCompleteEnabled) {
       builder.sessionToken = sessionToken
     }
+
+    Log.d(TAG, "lookUpPlaceByID: with placeID: $placeID \n fields: $selectedFields \n sessionToken: $sessionToken")
+
     placesClient.fetchPlace(builder.build()).addOnSuccessListener { response: FetchPlaceResponse ->
       val place = response.place
       val map = propertiesMapForPlace(place, selectedFields)
@@ -269,6 +245,11 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
         "E_PLACE_DETAILS_ERROR",
         Error(exception.message)
       )
+    }
+
+    if (sessionBasedAutoCompleteEnabled) {
+      // end session after the request
+      refreshSessionToken()
     }
   }
 
@@ -459,11 +440,11 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   ): List<Place.Field> {
     val selectedFields: MutableList<Place.Field> = ArrayList()
     if (placeFields.size == 0 && !isCurrentOrFetchPlace) {
-      return listOf(*Place.Field.values())
+      return Place.Field.entries
     }
     if (placeFields.size == 0) {
       val allPlaceFields: MutableList<Place.Field> =
-        ArrayList(listOf(*Place.Field.values()))
+        ArrayList(Place.Field.entries)
       allPlaceFields.removeAll(
         listOf(
           Place.Field.OPENING_HOURS,

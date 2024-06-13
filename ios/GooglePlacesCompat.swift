@@ -25,7 +25,7 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
     }
 
     @objc static func requiresMainQueueSetup() -> Bool {
-        return true
+        return false
     }
 
     @objc func methodQueue() -> DispatchQueue {
@@ -42,6 +42,10 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
 
     @objc func endAutocompleteSession() {
         token = nil
+    }
+
+    @objc func isAutoCompleteSessionStarted(_ resolve: RCTPromiseResolveBlock, rejecter reject: RCTPromiseRejectBlock) {
+        resolve(token != nil)
     }
 
     @objc func openAutocompleteModal(_ options: NSDictionary, withFields fields: [String], resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {

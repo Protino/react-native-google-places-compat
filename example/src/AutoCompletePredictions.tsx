@@ -10,10 +10,11 @@ import {
 import { useDebounce } from './Utils';
 import RNGooglePlacesCompat from 'react-native-google-places-compat';
 import type { GMSTypes } from '../../src/types';
+import { LOCATION_ONLY_FIELDS } from '../../src/';
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [sessionStarted, setSessionStarted] = useState(false);
+
   const [predictions, setPredictions] = useState<
     GMSTypes.AutocompletePrediction[]
   >([]);
@@ -22,12 +23,13 @@ export default function SearchScreen() {
   const debouncedQuery = useDebounce(query, 500); // Debounce query with a 500ms delay
 
   useEffect(() => {
+    RNGooglePlacesCompat.setSessionBasedAutocomplete(true);
+  }, []);
+
+  useEffect(() => {
     const fetchPredictions = async () => {
       if (debouncedQuery) {
         try {
-          if (!sessionStarted) {
-            RNGooglePlacesCompat.beginAutocompleteSession();
-          }
           const results = await RNGooglePlacesCompat.getAutocompletePredictions(
             debouncedQuery,
             {
@@ -45,15 +47,16 @@ export default function SearchScreen() {
     };
 
     fetchPredictions();
-  }, [debouncedQuery, sessionStarted]); // Effect depends on the debounced query
+  }, [debouncedQuery]); // Effect depends on the debounced query
 
   const selectPlace = async (placeId: string) => {
     try {
       setPredictions([]);
       console.log('Searching place by id - ', placeId);
-      const place = await RNGooglePlacesCompat.lookUpPlaceByID(placeId);
-      RNGooglePlacesCompat.endAutocompleteSession();
-      setSessionStarted(false);
+      const place = await RNGooglePlacesCompat.lookUpPlaceByID(
+        placeId,
+        LOCATION_ONLY_FIELDS
+      );
       setSelectedPlace(place);
       console.log('Place found - ', place);
     } catch (error) {
@@ -86,6 +89,9 @@ export default function SearchScreen() {
         <View style={styles.placeDetails}>
           <Text style={styles.placeName}>{selectedPlace.name}</Text>
           <Text>{selectedPlace.address}</Text>
+          <Text>
+            {selectedPlace.location.latitude},{selectedPlace.location.longitude}
+          </Text>
         </View>
       )}
     </View>

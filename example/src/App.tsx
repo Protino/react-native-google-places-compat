@@ -11,7 +11,7 @@ export default function App() {
       Platform.OS === 'ios'
         ? Config.IOS_PLACES_API_KEY
         : Config.ANDROID_PLACES_API_KEY,
-      false
+      true
     );
   }, []);
 

@@ -440,11 +440,11 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   ): List<Place.Field> {
     val selectedFields: MutableList<Place.Field> = ArrayList()
     if (placeFields.size == 0 && !isCurrentOrFetchPlace) {
-      return Place.Field.entries
+      return Place.Field.values().toList()
     }
     if (placeFields.size == 0) {
       val allPlaceFields: MutableList<Place.Field> =
-        ArrayList(Place.Field.entries)
+        ArrayList(Place.Field.values().toList())
       allPlaceFields.removeAll(
         listOf(
           Place.Field.OPENING_HOURS,

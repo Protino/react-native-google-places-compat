@@ -3,16 +3,18 @@ package com.googleplacescompatexample
 import android.app.Application
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
+import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
+import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
+import com.facebook.react.flipper.ReactNativeFlipper
 import com.facebook.soloader.SoLoader
-import googleplacescompatexample.ReactNativeFlipper
 
 class MainApplication : Application(), ReactApplication {
 
-  private val reactNativeHost: ReactNativeHost =
+  override val reactNativeHost: ReactNativeHost =
     object : DefaultReactNativeHost(this) {
       override fun getPackages(): List<ReactPackage> =
         PackageList(this).packages.apply {
@@ -27,9 +29,8 @@ class MainApplication : Application(), ReactApplication {
       override val isHermesEnabled: Boolean = BuildConfig.IS_HERMES_ENABLED
     }
 
-  override fun getReactNativeHost(): ReactNativeHost {
-    return reactNativeHost
-  }
+  override val reactHost: ReactHost
+    get() = getDefaultReactHost(this.applicationContext, reactNativeHost)
 
   override fun onCreate() {
     super.onCreate()

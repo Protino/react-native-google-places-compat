@@ -27,7 +27,7 @@
   ],
   "scripts": {
     "example": "npm --prefix example",
-    "postinstall": "npm run example -- install",
+    "setup-example": "npm run example -- install",
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",

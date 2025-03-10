@@ -152,27 +152,27 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
     @objc func getCurrentPlace(_ fields: [String], resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
         self.locationManager.requestAlwaysAuthorization()
 
-        let selectedFields = getSelectedFields(fields, isCurrentOrFetchPlace: true)
+        let selectedFields = convertToPlaceField(getSelectedFields(fields, isCurrentOrFetchPlace: true))
 
         var likelyPlacesList = [NSDictionary]()
 
-//        GMSPlacesClient.shared().findPlaceLikelihoodsFromCurrentLocation(withPlaceFields: selectedFields) { (likelihoods, error) in
-//            if let error = error {
-//                reject("E_CURRENT_PLACE_ERROR", error.localizedDescription, nil)
-//                return
-//            }
-//
-//            if let likelihoods = likelihoods {
-//                for likelihood in likelihoods {
-//                    var placeData = likelihood.place.toDictionary()
-//                    placeData["likelihood"] = NSNumber(value: likelihood.likelihood)
-//
-//                    likelyPlacesList.append(placeData)
-//                }
-//            }
-//
-//            resolve(likelyPlacesList)
-//        }
+        GMSPlacesClient.shared().findPlaceLikelihoodsFromCurrentLocation(withPlaceFields: selectedFields) { (likelihoods, error) in
+            if let error = error {
+                reject("E_CURRENT_PLACE_ERROR", error.localizedDescription, nil)
+                return
+            }
+
+            if let likelihoods = likelihoods {
+                for likelihood in likelihoods {
+                    var placeData = likelihood.place.toDictionary()
+                    placeData["likelihood"] = NSNumber(value: likelihood.likelihood)
+
+                    likelyPlacesList.append(placeData)
+                }
+            }
+
+            resolve(likelyPlacesList)
+        }
     }
 
     private func getSelectedFields(_ fields: [String], isCurrentOrFetchPlace currentOrFetch: Bool) -> [GMSPlaceProperty] {
@@ -207,6 +207,38 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
         }
 
         return selectedFields
+    }
+    
+    // Intermediary function to convert [GMSPlaceProperty] to GMSPlaceField
+    private func convertToPlaceField(_ properties: [GMSPlaceProperty]) -> GMSPlaceField {
+        var placeField: GMSPlaceField = []
+        
+        // Create a mapping between GMSPlaceProperty and GMSPlaceField
+        let propertyToFieldMapping: [GMSPlaceProperty: GMSPlaceField] = [
+            .name: .name,
+            .placeID: .placeID,
+            .plusCode: .plusCode,
+            .coordinate: .coordinate,
+            .openingHours: .openingHours,
+            .phoneNumber: .phoneNumber,
+            .formattedAddress: .formattedAddress,
+            .rating: .rating,
+            .userRatingsTotal: .userRatingsTotal,
+            .priceLevel: .priceLevel,
+            .types: .types,
+            .website: .website,
+            .viewport: .viewport,
+            .addressComponents: .addressComponents,
+            .photos: .photos
+        ]
+        
+        for property in properties {
+            if let field = propertyToFieldMapping[property] {
+                placeField = placeField.union(field)
+            }
+        }
+        
+        return placeField
     }
 
 

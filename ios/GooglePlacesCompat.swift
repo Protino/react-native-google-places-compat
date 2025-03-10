@@ -6,7 +6,8 @@ import CoreLocation
 class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
 
     static var instance: RNGooglePlaces?
-    var token: GMSAutocompleteSessionToken?
+    var token: GMSAutocompleteSessionToken? = nil
+    var sessionBasedAutoCompleteEnabled: Bool = false
     var locationManager: CLLocationManager!
 
     override init() {
@@ -32,20 +33,25 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
         return DispatchQueue.main
     }
 
-    @objc func initializePlaceClient(_ apiKey: String) {
+    @objc func initializePlaceClient(_ apiKey: String, sessionBasedAutocomplete: NSNumber) {
         GMSPlacesClient.provideAPIKey(apiKey)
+        self.sessionBasedAutoCompleteEnabled = sessionBasedAutocomplete.boolValue
+        refreshSessionToken()
     }
 
-    @objc func beginAutocompleteSession() {
-        token = GMSAutocompleteSessionToken.init()
+    @objc func setSessionBasedAutocomplete(_ enabled: NSNumber) {
+        sessionBasedAutoCompleteEnabled = enabled.boolValue
+        if !sessionBasedAutoCompleteEnabled {
+            token = nil
+        }
     }
-
-    @objc func endAutocompleteSession() {
-        token = nil
-    }
-
-    @objc func isAutoCompleteSessionStarted(_ resolve: RCTPromiseResolveBlock, rejecter reject: RCTPromiseRejectBlock) {
-        resolve(token != nil)
+    
+    @objc func refreshSessionToken() {
+        if (self.sessionBasedAutoCompleteEnabled) {
+            token = GMSAutocompleteSessionToken.init()
+        } else {
+            token = nil
+        }
     }
 
     @objc func openAutocompleteModal(_ options: NSDictionary, withFields fields: [String], resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
@@ -53,17 +59,17 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
             // Assume RNGooglePlacesViewController has been translated to Swift
             let acController = RNGooglePlacesViewController()
 
-            let selectedFields = self.getSelectedFields(fields, isCurrentOrFetchPlace: false)
+            let selectedFields = self.getSelectedFields(fields, isCurrentOrFetchPlace: false).map {$0.rawValue }
             let autocompleteFilter = GMSAutocompleteFilter()
             autocompleteFilter.types = options["types"] as? [String] ?? nil
             autocompleteFilter.countries = options["countries"] as? [String] ?? nil
             autocompleteFilter.locationBias = getLocationOption(from: options, forKey: "locationBias")
             autocompleteFilter.locationRestriction = getLocationOption(from: options, forKey: "locationRestriction")
 
-            acController.openAutocompleteModal(autocompleteFilter: autocompleteFilter,
-                                               placeFields: selectedFields,
-                                               resolver: resolve,
-                                               rejecter: reject)
+//            acController.openAutocompleteModal(autocompleteFilter: autocompleteFilter,
+//                                               placeFields: selectedFields,
+//                                               resolver: resolve,
+//                                               rejecter: reject)
         } catch let error as NSError {
             reject("E_OPEN_FAILED", "Could not open modal", error)
         }
@@ -71,13 +77,29 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
 
     @objc func getAutocompletePredictions(_ query: String, filterOptions: NSDictionary, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
         var autoCompleteSuggestionsList = [[String: Any]]()
+
+        // Create the autocomplete filter
         let autocompleteFilter = GMSAutocompleteFilter()
         autocompleteFilter.types = filterOptions["types"] as? [String]
         autocompleteFilter.countries = filterOptions["countries"] as? [String]
-        autocompleteFilter.locationBias = getLocationOption(from: filterOptions, forKey: "locationBias")
-        autocompleteFilter.locationRestriction = getLocationOption(from: filterOptions, forKey: "locationRestriction")
 
-        GMSPlacesClient.shared().findAutocompletePredictions(fromQuery: query, filter: autocompleteFilter, sessionToken: token, callback: { results, error in
+        if let locationBias = getLocationOption(from: filterOptions, forKey: "locationBias") {
+            autocompleteFilter.locationBias = locationBias
+        }
+
+        if let locationRestriction = getLocationOption(from: filterOptions, forKey: "locationRestriction") {
+            autocompleteFilter.locationRestriction = locationRestriction
+        }
+
+        // Create the autocomplete request
+        let request = GMSAutocompleteRequest(query: query)
+        request.filter = autocompleteFilter
+        request.sessionToken = token
+        
+        print("Fetching autocomplete predictions - filters: \(autocompleteFilter), sessionToken: \(String(describing: token))")
+
+        // Fetch autocomplete suggestions
+        GMSPlacesClient.shared().fetchAutocompleteSuggestions(from: request) { (results, error) in
             if let error = error {
                 reject("E_AUTOCOMPLETE_ERROR", error.localizedDescription, error)
                 return
@@ -86,12 +108,11 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
             if let results = results {
                 for result in results {
                     var placeData = [String: Any]()
-
-                    placeData["fullText"] = result.attributedFullText.string
-                    placeData["primaryText"] = result.attributedPrimaryText.string
-                    placeData["secondaryText"] = result.attributedSecondaryText?.string
-                    placeData["placeID"] = result.placeID
-                    placeData["types"] = result.types
+                    placeData["fullText"] = result.placeSuggestion?.attributedFullText.string
+                    placeData["primaryText"] = result.placeSuggestion?.attributedPrimaryText.string
+                    placeData["secondaryText"] = result.placeSuggestion?.attributedSecondaryText?.string
+                    placeData["placeID"] = result.placeSuggestion?.placeID
+                    placeData["types"] = result.placeSuggestion?.types
 
                     autoCompleteSuggestionsList.append(placeData)
                 }
@@ -100,13 +121,20 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
             } else {
                 reject("E_AUTOCOMPLETE_ERROR", "No results found", nil)
             }
-        })
+        }
     }
 
     @objc func lookUpPlaceByID(_ placeID: String, withFields fields: [String], resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
-        let selectedFields = getSelectedFields(fields, isCurrentOrFetchPlace: false)
+        
+        let selectedFields = getSelectedFields(fields, isCurrentOrFetchPlace: false).map {$0.rawValue }
 
-        GMSPlacesClient.shared().fetchPlace(fromPlaceID: placeID, placeFields: selectedFields, sessionToken: nil) { (place, error) in
+        // Create the fetch place request
+        let fetchPlaceRequest = GMSFetchPlaceRequest(placeID: placeID, placeProperties: selectedFields, sessionToken: token)
+
+        print("Request to look up place by ID - \(placeID); Fields - \(fields); Parse fields: \(selectedFields); Session token: \(String(describing: token))")
+              
+        // Fetch the place details
+        GMSPlacesClient.shared().fetchPlace(with: fetchPlaceRequest) { (place, error) in
             if let error = error {
                 reject("E_PLACE_DETAILS_ERROR", error.localizedDescription, nil)
                 return
@@ -118,6 +146,7 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
                 resolve([:])
             }
         }
+        self.refreshSessionToken()
     }
 
     @objc func getCurrentPlace(_ fields: [String], resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
@@ -127,27 +156,27 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
 
         var likelyPlacesList = [NSDictionary]()
 
-        GMSPlacesClient.shared().findPlaceLikelihoodsFromCurrentLocation(withPlaceFields: selectedFields) { (likelihoods, error) in
-            if let error = error {
-                reject("E_CURRENT_PLACE_ERROR", error.localizedDescription, nil)
-                return
-            }
-
-            if let likelihoods = likelihoods {
-                for likelihood in likelihoods {
-                    var placeData = likelihood.place.toDictionary()
-                    placeData["likelihood"] = NSNumber(value: likelihood.likelihood)
-
-                    likelyPlacesList.append(placeData)
-                }
-            }
-
-            resolve(likelyPlacesList)
-        }
+//        GMSPlacesClient.shared().findPlaceLikelihoodsFromCurrentLocation(withPlaceFields: selectedFields) { (likelihoods, error) in
+//            if let error = error {
+//                reject("E_CURRENT_PLACE_ERROR", error.localizedDescription, nil)
+//                return
+//            }
+//
+//            if let likelihoods = likelihoods {
+//                for likelihood in likelihoods {
+//                    var placeData = likelihood.place.toDictionary()
+//                    placeData["likelihood"] = NSNumber(value: likelihood.likelihood)
+//
+//                    likelyPlacesList.append(placeData)
+//                }
+//            }
+//
+//            resolve(likelyPlacesList)
+//        }
     }
 
-    private func getSelectedFields(_ fields: [String], isCurrentOrFetchPlace currentOrFetch: Bool) -> GMSPlaceField {
-        let fieldsMapping: [String: GMSPlaceField] = [
+    private func getSelectedFields(_ fields: [String], isCurrentOrFetchPlace currentOrFetch: Bool) -> [GMSPlaceProperty] {
+        let fieldsMapping: [String: GMSPlaceProperty] = [
             "name": .name,
             "placeID": .placeID,
             "plusCode": .plusCode,
@@ -165,19 +194,15 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
             "photos": .photos
         ]
 
-        // Default to all fields if not filtering based on currentOrFetch and fields are empty
-        guard !fields.isEmpty else {
-            return currentOrFetch ? .all.subtracting([.openingHours, .phoneNumber, .website, .addressComponents]) : .all
-        }
-
         // Compute the fields for non-empty input
-        let selectedFields: GMSPlaceField = fields.reduce(into: GMSPlaceField()) { result, fieldName in
+        var selectedFields: [GMSPlaceProperty] = []
+        for fieldName in fields {
             if let fieldValue = fieldsMapping[fieldName] {
                 // If currentOrFetch is true, exclude specific fields
                 if currentOrFetch && [.openingHours, .phoneNumber, .website, .addressComponents].contains(fieldValue) {
-                    return
+                    continue
                 }
-                result.insert(fieldValue)
+                selectedFields.append(fieldValue)
             }
         }
 

@@ -1,15 +1,35 @@
-// Assuming the interfaces and types from your index.d.ts or similar have been defined
-import { NativeModules } from 'react-native';
-import type {
-  GMSTypes,
-  PlaceFields,
-  CurrentPlace,
-  RNGooglePlacesNativeOptions,
-} from './types';
+import NativeModule, {
+  type Spec,
+  type Place,
+  type AutocompletePrediction,
+  type AutoCompleteOptions,
+} from './NativeGooglePlacesCompat'; // Assuming NativeGooglePlacesCompat.ts exports the TurboModule instance as default
 
-const RNGooglePlacesNative = NativeModules.RNGooglePlaces;
+// Re-export types from the spec for external use if needed, or define new ones.
+// For now, let's assume the types from NativeGooglePlacesCompat.ts are the source of truth.
+export type { Place, AutocompletePrediction, AutoCompleteOptions };
 
-const LOCATION_ONLY_FIELDS: PlaceFields[] = [
+// It's good practice to ensure the native module is available.
+const RNGooglePlacesCompatModule = NativeModule;
+
+if (!RNGooglePlacesCompatModule) {
+  // Fallback for older RN versions or if TurboModule linkage fails.
+  // This part might need adjustment based on how the old arch was handled.
+  // For simplicity, we'll throw an error if the TurboModule isn't found.
+  // In a real library, you might have a bridge to the old NativeModules.RNGooglePlaces.
+  throw new Error(
+    'Failed to load NativeGooglePlacesCompat module. Did you properly link the library? Or is the New Architecture not enabled?'
+  );
+}
+
+// Define PlaceFields based on the keys of the Place interface from the spec
+// This makes it more type-safe and aligned with the actual data.
+// We need to be careful here, as PlaceFields was used as an array of strings.
+// The native side expects string keys.
+export type PlaceFields = keyof Place; // This creates a union of string literals
+
+// Keep this if it's still relevant for users, but ensure its values are valid PlaceFields.
+export const LOCATION_ONLY_FIELDS: PlaceFields[] = [
   'addressComponents',
   'address',
   'location',
@@ -19,90 +39,93 @@ const LOCATION_ONLY_FIELDS: PlaceFields[] = [
 ];
 
 class RNGooglePlaces {
-  static optionsDefaults: RNGooglePlacesNativeOptions = {
-    type: null,
-    types: null,
-    country: '',
-    countries: null,
+  // Default options should align with AutoCompleteOptions from the spec
+  static optionsDefaults: AutoCompleteOptions = {
+    // type: undefined, // Let native side handle defaults if not provided
+    // types: undefined,
+    country: '', // Or undefined
+    // countries: undefined,
     useOverlay: false,
     initialQuery: '',
-    locationBias: {
-      latitudeSW: 0,
-      longitudeSW: 0,
-      latitudeNE: 0,
-      longitudeNE: 0,
-    },
-    locationRestriction: {
-      latitudeSW: 0,
-      longitudeSW: 0,
-      latitudeNE: 0,
-      longitudeNE: 0,
-    },
+    locationBias: undefined, // Use undefined for optional complex objects
+    locationRestriction: undefined,
   };
 
-  static placeFieldsDefaults: (keyof GMSTypes.Place)[] = [];
+  // Default fields for place requests - can be an empty array or predefined common fields.
+  // Ensure these are valid keys of the `Place` interface.
+  static placeFieldsDefaults: Array<string> = []; // Keep as string array for native module
 
   initializePlaceClient(
     apiKey: string,
     sessionBasedAutocomplete: boolean = false
-  ) {
-    RNGooglePlacesNative.initializePlaceClient(
+  ): void {
+    RNGooglePlacesCompatModule.initializePlaceClient(
       apiKey,
       sessionBasedAutocomplete
     );
   }
 
-  openAutocompleteModal(
-    options: Partial<RNGooglePlacesNativeOptions> = {},
-    placeFields: PlaceFields[] = []
-  ): Promise<GMSTypes.Place> {
-    return RNGooglePlacesNative.openAutocompleteModal(
-      {
-        ...RNGooglePlaces.optionsDefaults,
-        ...options,
-      },
-      [...RNGooglePlaces.placeFieldsDefaults, ...placeFields]
-    );
-  }
-
-  getAutocompletePredictions(
-    query: string,
-    options: Partial<RNGooglePlacesNativeOptions> = {}
-  ): Promise<GMSTypes.AutocompletePrediction[]> {
-    return RNGooglePlacesNative.getAutocompletePredictions(query, {
+  async openAutocompleteModal(
+    options: Partial<AutoCompleteOptions> = {},
+    placeFields: string[] = [] // string array matching native expectation
+  ): Promise<Place> {
+    const mergedOptions: AutoCompleteOptions = {
       ...RNGooglePlaces.optionsDefaults,
       ...options,
-    });
+    };
+    // Ensure all fields are strings
+    const mergedFields = [
+      ...RNGooglePlaces.placeFieldsDefaults,
+      ...placeFields,
+    ].map(String);
+    return RNGooglePlacesCompatModule.openAutocompleteModal(mergedOptions, mergedFields);
   }
 
-  lookUpPlaceByID(
+  async getAutocompletePredictions(
+    query: string,
+    options: Partial<AutoCompleteOptions> = {}
+  ): Promise<Array<AutocompletePrediction>> {
+    const mergedOptions: AutoCompleteOptions = {
+      ...RNGooglePlaces.optionsDefaults,
+      ...options,
+    };
+    return RNGooglePlacesCompatModule.getAutocompletePredictions(query, mergedOptions);
+  }
+
+  async lookUpPlaceByID(
     placeID: string,
-    placeFields: PlaceFields[] = []
-  ): Promise<GMSTypes.Place> {
-    return RNGooglePlacesNative.lookUpPlaceByID(placeID, [
+    placeFields: string[] = [] // string array
+  ): Promise<Place> {
+    // Ensure all fields are strings
+    const mergedFields = [
       ...RNGooglePlaces.placeFieldsDefaults,
       ...placeFields,
-    ]);
+    ].map(String);
+    return RNGooglePlacesCompatModule.lookUpPlaceByID(placeID, mergedFields);
   }
 
-  getCurrentPlace(placeFields: PlaceFields[] = []): Promise<CurrentPlace[]> {
-    return RNGooglePlacesNative.getCurrentPlace([
+  async getCurrentPlace(placeFields: string[] = []): Promise<Array<Place>> {
+    // Ensure all fields are strings
+    const mergedFields = [
       ...RNGooglePlaces.placeFieldsDefaults,
       ...placeFields,
-    ]);
+    ].map(String);
+    return RNGooglePlacesCompatModule.getCurrentPlace(mergedFields);
   }
 
-  setSessionBasedAutocomplete(enabled: boolean) {
-    RNGooglePlacesNative.setSessionBasedAutocomplete(enabled);
+  setSessionBasedAutocomplete(enabled: boolean): void {
+    RNGooglePlacesCompatModule.setSessionBasedAutocomplete(enabled);
+    // The native module's setSessionBasedAutocomplete might already refresh the token if needed.
+    // Calling refreshSessionToken() here might be redundant or intended.
+    // For now, keeping it to match original behavior.
     this.refreshSessionToken();
   }
 
-  refreshSessionToken() {
-    RNGooglePlacesNative.refreshSessionToken();
+  refreshSessionToken(): void {
+    RNGooglePlacesCompatModule.refreshSessionToken();
   }
 }
 
-const RNGooglePlacesCompat = new RNGooglePlaces();
-export type { GMSTypes };
-export { LOCATION_ONLY_FIELDS };
-export default RNGooglePlacesCompat;
+const RNGooglePlacesInstance = new RNGooglePlaces();
+// Export the instance as default, and potentially the class and types too.
+export default RNGooglePlacesInstance;

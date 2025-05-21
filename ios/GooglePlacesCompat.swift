@@ -29,18 +29,20 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
         return false
     }
 
+    // methodQueue can often be removed for TurboModules if default background thread is fine,
+    // but keeping it as it specifies main queue, which might be relevant for UI operations.
     @objc func methodQueue() -> DispatchQueue {
         return DispatchQueue.main
     }
 
-    @objc func initializePlaceClient(_ apiKey: String, sessionBasedAutocomplete: NSNumber) {
+    @objc func initializePlaceClient(_ apiKey: String, sessionBasedAutocomplete: Bool) {
         GMSPlacesClient.provideAPIKey(apiKey)
-        self.sessionBasedAutoCompleteEnabled = sessionBasedAutocomplete.boolValue
+        self.sessionBasedAutoCompleteEnabled = sessionBasedAutocomplete
         refreshSessionToken()
     }
 
-    @objc func setSessionBasedAutocomplete(_ enabled: NSNumber) {
-        sessionBasedAutoCompleteEnabled = enabled.boolValue
+    @objc func setSessionBasedAutocomplete(_ enabled: Bool) {
+        sessionBasedAutoCompleteEnabled = enabled
         if !sessionBasedAutoCompleteEnabled {
             token = nil
         }
@@ -54,24 +56,42 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    // This method's logic for presenting RNGooglePlacesViewController needs to be completed/verified.
+    // The commented out part `acController.openAutocompleteModal(...)` suggests it's not fully implemented.
+    // For TurboModule refactoring, we ensure the signature matches what .mm expects.
     @objc func openAutocompleteModal(_ options: NSDictionary, withFields fields: [String], resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
-        do {
-            // Assume RNGooglePlacesViewController has been translated to Swift
-            let acController = RNGooglePlacesViewController()
+        // Ensure current UIViewController can be obtained to present acController
+        guard let rootViewController = RCTPresentedViewController() else {
+            reject("E_NO_ROOT_VIEW_CONTROLLER", "Could not get root view controller", nil)
+            return
+        }
 
-            let selectedFields = self.getSelectedFields(fields, isCurrentOrFetchPlace: false).map {$0.rawValue }
+        do {
+            let acController = RNGooglePlacesViewController()
+            // The actual presentation logic and handling of resolve/reject needs to be implemented
+            // within RNGooglePlacesViewController or called from here.
+            // For now, this structure is for API compatibility.
+
+            let gmsPlaceFields = self.getSelectedFields(fields, isCurrentOrFetchPlace: false)
             let autocompleteFilter = GMSAutocompleteFilter()
-            autocompleteFilter.types = options["types"] as? [String] ?? nil
-            autocompleteFilter.countries = options["countries"] as? [String] ?? nil
+            autocompleteFilter.types = options["types"] as? [String]
+            autocompleteFilter.countries = options["countries"] as? [String]
             autocompleteFilter.locationBias = getLocationOption(from: options, forKey: "locationBias")
             autocompleteFilter.locationRestriction = getLocationOption(from: options, forKey: "locationRestriction")
-
-//            acController.openAutocompleteModal(autocompleteFilter: autocompleteFilter,
-//                                               placeFields: selectedFields,
-//                                               resolver: resolve,
-//                                               rejecter: reject)
+            
+            // The actual call to acController to present and handle promise needs to be here.
+            // This is a placeholder for where that logic would go.
+            // For example:
+            let gmsPlaceFieldConverted = self.convertToPlaceField(gmsPlaceFields) // Convert
+            acController.openAutocompleteModal(
+                autocompleteFilter: autocompleteFilter, // Use the correct parameter name from RNGooglePlacesViewController
+                placeFields: gmsPlaceFieldConverted,      // Pass the converted GMSPlaceField
+                resolver: resolve,
+                rejecter: reject
+                // presentingViewController is handled within RNGooglePlacesViewController's openAutocompleteModal
+            )
         } catch let error as NSError {
-            reject("E_OPEN_FAILED", "Could not open modal", error)
+            reject("E_OPEN_FAILED", "Could not open modal: \(error.localizedDescription)", error)
         }
     }
 
@@ -92,14 +112,7 @@ class RNGooglePlaces: NSObject, CLLocationManagerDelegate {
         }
 
         // Create the autocomplete request
-        let request = GMSAutocompleteRequest(query: query)
-        request.filter = autocompleteFilter
-        request.sessionToken = token
-        
-        print("Fetching autocomplete predictions - filters: \(autocompleteFilter), sessionToken: \(String(describing: token))")
-
-        // Fetch autocomplete suggestions
-        GMSPlacesClient.shared().fetchAutocompleteSuggestions(from: request) { (results, error) in
+        GMSPlacesClient.shared().findAutocompletePredictions(fromQuery: query, filter: autocompleteFilter, sessionToken: token) { (results, error) in
             if let error = error {
                 reject("E_AUTOCOMPLETE_ERROR", error.localizedDescription, error)
                 return

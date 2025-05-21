@@ -16,6 +16,9 @@ export interface LatLng {
   latitude: number;
 }
 
+// Import the Place interface from the spec file to be extended
+import { Place } from './NativeGooglePlacesCompat';
+
 /**
  * Current place, with additional likelihood property.
  *
@@ -24,7 +27,7 @@ export interface LatLng {
  * and [com.google.android.libraries.places.api.net.PlaceLikelihood](https://developers.google.com/places/android-sdk/reference/com/google/android/libraries/places/api/model/PlaceLikelihood),
  * though the likelihood has been flattened into the Place object.
  */
-export interface CurrentPlace extends GMSTypes.Place {
+export interface CurrentPlace extends Place { // Changed GMSTypes.Place to Place
   /**
    * Returns a value from 0.0 to 1.0 indicating the confidence that the user
    * is at this place.
@@ -36,121 +39,16 @@ export interface CurrentPlace extends GMSTypes.Place {
   likelihood: number;
 }
 
+// GMSTypes.Place and GMSTypes.AutocompletePrediction are removed as their counterparts
+// are now defined in NativeGooglePlacesCompat.ts and re-exported by src/index.ts.
+// Consumers should use Place and AutocompletePrediction from the library's main export.
+
 /**
  * Internal mappings to Google Maps Services types.
  */
 export namespace GMSTypes {
-  /**
-   * Internal mapping to [GMSPlace](https://developers.google.com/places/ios-sdk/reference/interface_g_m_s_place)
-   * and [com.google.android.libraries.places.api.model.Place](https://developers.google.com/places/android-sdk/reference/com/google/android/libraries/places/api/model/Place).
-   *
-   * Represents a particular physical space.
-   *
-   * A Place encapsulates information about a physical location, including
-   * its name, address, and any other information we might have about it.
-   */
-  export interface Place {
-    /**
-     * Name of the place.
-     */
-    name: string;
-
-    /**
-     * Place ID of this place.
-     *
-     * For more information: [Place IDs](https://developers.google.com/places/place-id)
-     */
-    placeID: string;
-
-    /**
-     * The Plus code representation of location for this place.
-     */
-    plusCode: PlusCode;
-
-    /**
-     * Location of the place.
-     *
-     * Corresponds to [coordinates](https://developers.google.com/places/ios-sdk/reference/interface_g_m_s_place.html#a3dc43865df0de69b6b1203a15a745efc)
-     * and [getLatLng](https://developers.google.com/places/android-sdk/reference/com/google/android/libraries/places/api/model/Place.html#getLatLng()).
-     */
-    location: LatLng;
-
-    /**
-     * The Opening Hours information for this place.
-     *
-     * The mapping only contains the weekday text, i.e.
-     * [GMSOpeningHours#weekdayTest](https://developers.google.com/places/ios-sdk/reference/interface_g_m_s_opening_hours.html#a6a4cd04495230795fcd04d814c71d107)
-     * and [OpeningHours#getWeekdayTest](https://developers.google.com/places/android-sdk/reference/com/google/android/libraries/places/api/model/OpeningHours.html#getWeekdayText()).
-     */
-    openingHours: string[];
-
-    /**
-     * Phone number of this place, in international format, i.e. including the
-     * country code prefixed with "+". For example, Google Sydney's phone
-     * number is "+61 2 9374 4000".
-     */
-    phoneNumber: string;
-
-    /**
-     * Simple address of the Place.
-     *
-     * Corresponds to [formattedAddress](https://developers.google.com/places/ios-sdk/reference/interface_g_m_s_place.html#a8926a762ae78bcd18c0ea126d270ef3d)
-     * and [getAddress](https://developers.google.com/places/android-sdk/reference/com/google/android/libraries/places/api/model/Place.html#getAddress())
-     */
-    address: string;
-
-    /**
-     * Five-star rating for this place based on user reviews.
-     *
-     * Ratings range from 1.0 to 5.0. 0.0 means we have no rating for this
-     * place (e.g. because not enough users have reviewed this place).
-     */
-    rating: number;
-
-    /**
-     * Represents how many reviews make up this place's rating.
-     */
-    userRatingsTotal: number;
-
-    /**
-     * Price level for this place, as integers from 0 to 4.
-     *
-     * e.g. A value of 4 means this place is "$$$$" (expensive). A value of 0
-     * means free (such as a museum with free admission).
-     */
-    priceLevel: number;
-
-    /**
-     * The types of this place.
-     */
-    types: ReturnPlaceType[];
-
-    /**
-     * Website for this place.
-     *
-     * This is the URI of the website maintained by the Place, if available.
-     * This link is always for a third-party website not affiliated with the
-     * Places API.
-     *
-     * Corresponds to [website](https://developers.google.com/places/ios-sdk/reference/interface_g_m_s_place.html#a7b9ee24d284ac279eed7f83a838354fe)
-     * and [getWebsiteUri](https://developers.google.com/places/android-sdk/reference/com/google/android/libraries/places/api/model/Place.html#getWebsiteUri()).
-     */
-    website: string;
-
-    /**
-     * This returns a viewport of a size that is suitable for displaying this
-     * place. For example, a Place object representing a store may have a
-     * relatively small viewport, while a Place object representing a country
-     * may have a very large viewport.
-     */
-    viewport: GeoCoordinateBounds;
-
-    /**
-     * Address components. If you need the full address, consider using
-     * `address` instead.
-     */
-    addressComponents: Array<AddressComponent>;
-  }
+  // PlusCode, AddressComponent, PlaceType, ReadOnlyPlaceType, ReturnPlaceType, AutocompleteType
+  // are kept as they provide detailed type information useful for library consumers.
 
   /**
    * Internal mapping to [GMSPlusCode](https://developers.google.com/places/ios-sdk/reference/interface_g_m_s_place)
@@ -430,48 +328,11 @@ export namespace GMSTypes {
    * An AutocompletePrediction includes the description of the suggested place
    * as well as basic details including place ID and types.
    */
-  export interface AutocompletePrediction {
-    /**
-     * The full text of a place. This is a combination of the primary text
-     * and the secondary text.
-     *
-     * Example: "Eiffel Tower, Avenue Anatole France, Paris, France"
-     */
-    fullText: string;
-
-    /**
-     * Returns the primary text of a place. This will usually be the name of
-     * the place.
-     *
-     * Example: "Eiffel Tower", "123 Pitt Street"
-     */
-    primaryText: string;
-
-    /**
-     * Returns the secondary text of a place. This provides extra context on
-     * the place, and can be used as a second line when showing autocomplete
-     * predictions.
-     *
-     * Example: "Avenue Anatole France, Paris, France", "Sydney, New South
-     * Wales"
-     */
-    secondaryText: string;
-
-    /**
-     * Returns the place ID of the place being referred to by this prediction.
-     *
-     * For more information: [Place IDs](https://developers.google.com/places/place-id)
-     */
-    placeID: string;
-
-    /**
-     * The types of this autocomplete result.
-     */
-    types?: ReturnPlaceType;
-  }
+  // AutocompletePrediction interface removed from here
 }
 
-export type PlaceFields = keyof GMSTypes.Place;
+// PlaceFields type is removed as it's now exported from src/index.ts,
+// deriving from the Place type in NativeGooglePlacesCompat.ts.
 
 /**
  * Google Places options.

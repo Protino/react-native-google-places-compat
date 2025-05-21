@@ -12,9 +12,8 @@ import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
+import androidx.annotation.Nullable
 import com.facebook.react.bridge.ReactApplicationContext
-import com.facebook.react.bridge.ReactContextBaseJavaModule
-import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
@@ -36,8 +35,9 @@ import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 import com.googleplacescompat.RNGooglePlacesPlaceFieldEnum.Companion.findByFieldKey
 import com.googleplacescompat.RNGooglePlacesPlaceTypeEnum.Companion.findByTypeId
 
+// Changed to extend RNGooglePlacesCompatSpec and remove ReactContextBaseJavaModule
 class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
-  ReactContextBaseJavaModule(reactContext), ActivityEventListener {
+  RNGooglePlacesCompatSpec(reactContext), ActivityEventListener {
 
   private var pendingPromise: Promise? = null
   private var lastSelectedFields: List<Place.Field>? = null
@@ -45,17 +45,16 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   private var sessionToken: AutocompleteSessionToken? = null
   private var sessionBasedAutoCompleteEnabled = false
 
-  override fun getName(): String {
-    return REACT_CLASS
-  }
+  // getName is now inherited from RNGooglePlacesCompatSpec
 
-  @ReactMethod
-  fun initializePlaceClient(apiKey: String, sessionBasedAutocomplete: Boolean = false) {
+  // @ReactMethod annotation removed, @Nullable added for sessionBasedAutocomplete
+  override fun initializePlaceClient(apiKey: String, @Nullable sessionBasedAutocomplete: Boolean?) {
+    val enableSessionBasedAutocomplete = sessionBasedAutocomplete ?: false
     if (!Places.isInitialized() && apiKey.isNotBlank()) {
       Places.initializeWithNewPlacesApiEnabled(reactContext.applicationContext, apiKey)
       placesClient = Places.createClient(reactContext.applicationContext)
       reactContext.addActivityEventListener(this)
-      sessionBasedAutoCompleteEnabled = sessionBasedAutocomplete
+      this.sessionBasedAutoCompleteEnabled = enableSessionBasedAutocomplete // Use the resolved value
       refreshSessionToken()
     }
   }
@@ -95,20 +94,20 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
    * Exposed React's methods
    */
 
-  @ReactMethod
-  fun refreshSessionToken() {
+  // @ReactMethod annotation removed
+  override fun refreshSessionToken() {
     if (sessionBasedAutoCompleteEnabled) {
       sessionToken = AutocompleteSessionToken.newInstance()
     }
   }
 
-  @ReactMethod
-  fun setSessionBasedAutocomplete(enabled: Boolean) {
+  // @ReactMethod annotation removed
+  override fun setSessionBasedAutocomplete(enabled: Boolean) {
     sessionBasedAutoCompleteEnabled = enabled
   }
 
-  @ReactMethod
-  fun openAutocompleteModal(options: ReadableMap, fields: ReadableArray, promise: Promise) {
+  // @ReactMethod annotation removed
+  override fun openAutocompleteModal(options: ReadableMap, fields: ReadableArray, promise: Promise) {
     if (!Places.isInitialized()) {
       promise.reject(
         "E_API_KEY_ERROR",
@@ -153,8 +152,8 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
     )
   }
 
-  @ReactMethod
-  fun getAutocompletePredictions(query: String?, options: ReadableMap, promise: Promise) {
+  // @ReactMethod annotation removed, query marked as @Nullable based on typical spec generation
+  override fun getAutocompletePredictions(query: @Nullable String?, options: ReadableMap, promise: Promise) {
     pendingPromise = promise
     if (!Places.isInitialized()) {
       promise.reject(
@@ -213,8 +212,8 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
-  @ReactMethod
-  fun lookUpPlaceByID(placeID: String?, fields: ReadableArray, promise: Promise) {
+  // @ReactMethod annotation removed, placeID marked as @Nullable
+  override fun lookUpPlaceByID(placeID: @Nullable String?, fields: ReadableArray, promise: Promise) {
     pendingPromise = promise
     if (!Places.isInitialized()) {
       promise.reject(
@@ -253,9 +252,9 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
-  @ReactMethod
+  // @ReactMethod annotation removed
   @RequiresPermission(allOf = [permission.ACCESS_FINE_LOCATION, permission.ACCESS_WIFI_STATE])
-  fun getCurrentPlace(fields: ReadableArray, promise: Promise) {
+  override fun getCurrentPlace(fields: ReadableArray, promise: Promise) {
     if (ContextCompat.checkSelfPermission(
         reactContext.applicationContext,
         permission.ACCESS_WIFI_STATE
@@ -504,6 +503,6 @@ class RNGooglePlacesModule(private val reactContext: ReactApplicationContext) :
   companion object {
     const val TAG = "RNGooglePlaces"
     var AUTOCOMPLETE_REQUEST_CODE = 360
-    var REACT_CLASS = "RNGooglePlaces"
+    // REACT_CLASS constant is no longer needed here as getName() uses RNGooglePlacesCompatSpec.NAME
   }
 }
